@@ -12,7 +12,46 @@
 </head>
 <body>
 
-    <div class="app-container">
+    <!-- Authentication Views -->
+    <div id="auth-view" class="auth-container" style="display: none;">
+        <div class="auth-box">
+            <h1 id="auth-title">Login to Jarvis</h1>
+            <div id="auth-error" class="auth-error"></div>
+
+            <div class="auth-form-group">
+                <label>Username</label>
+                <input type="text" id="auth-username" placeholder="Enter username">
+            </div>
+            <div class="auth-form-group">
+                <label>Password</label>
+                <input type="password" id="auth-password" placeholder="Enter password">
+            </div>
+
+            <button id="auth-submit-btn" class="auth-btn">Login</button>
+
+            <div class="auth-switch">
+                <span id="auth-switch-text">Don't have an account? <a id="auth-switch-link">Register</a></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Access Code View -->
+    <div id="code-view" class="auth-container" style="display: none;">
+        <div class="auth-box">
+            <h1>Beta Access Required</h1>
+            <p style="color: var(--text-secondary); margin-bottom: 24px;">Please enter your access code to continue.</p>
+            <div id="code-error" class="auth-error"></div>
+
+            <div class="auth-form-group">
+                <label>Access Code</label>
+                <input type="text" id="access-code" placeholder="Enter 16-character code">
+            </div>
+
+            <button id="code-submit-btn" class="auth-btn">Link Code</button>
+        </div>
+    </div>
+
+    <div class="app-container" id="main-app" style="display: none;">
         <!-- SIDEBAR -->
         <aside class="sidebar">
             <div class="sidebar-header">
@@ -41,20 +80,18 @@
                 <span class="section-title">Recents</span>
                 <ul class="recents-list" id="chat-history-list">
                     <!-- History injected here -->
-                    <li>Jarvis API integration</li>
-                    <li>Python debugging help</li>
-                    <li>Website design ideas</li>
                 </ul>
             </div>
 
             <div class="sidebar-footer">
                 <div class="user-profile">
-                    <div class="avatar">U</div>
+                    <div class="avatar" id="user-avatar">U</div>
                     <div class="user-details">
-                        <span class="name">User</span>
-                        <span class="plan">Free plan</span>
+                        <span class="name" id="user-name">User</span>
+                        <span class="plan">Beta Access</span>
                     </div>
                 </div>
+                <button class="icon-btn" id="logout-btn" title="Logout" style="margin-left:auto"><i class='bx bx-log-out'></i></button>
             </div>
         </aside>
 
@@ -75,8 +112,8 @@
             <div class="chat-container">
                 <!-- Welcome Screen (Visible on new chat) -->
                 <div class="welcome-screen" id="welcome-screen">
-                    <div class="plan-badge">Free plan · <a href="#">Upgrade</a></div>
-                    <h1 class="greeting"><i class='bx bxs-sun' style='color:#d87b5a'></i> Good afternoon, User</h1>
+                    <div class="plan-badge">Beta Access · <a href="#">Details</a></div>
+                    <h1 class="greeting"><i class='bx bxs-sun' style='color:#d87b5a'></i> Good afternoon, <span id="welcome-name">User</span></h1>
                 </div>
 
                 <!-- Messages Area -->

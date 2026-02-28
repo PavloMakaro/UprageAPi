@@ -6,6 +6,8 @@ from aiohttp import web
 from core.agent import Agent
 from core.tools import ToolRegistry
 from core.watcher import ModuleWatcher
+import auth
+from database import generate_access_codes
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -30,24 +32,166 @@ app = web.Application()
 user_sessions = {}
 session_lock = asyncio.Lock()
 
+# Authentication Middleware
+@web.middleware
+async def auth_middleware(request, handler):
+    # Public routes
+    public_routes = ['/', '/static/', '/auth/register', '/auth/login']
+
+    if request.path in public_routes or request.path.startswith('/static/') or request.path.startswith('/auth/'):
+        return await handler(request)
+
+    # Optional auth for OPTIONS (CORS)
+    if request.method == "OPTIONS":
+        return await handler(request)
+
+    # Get token from headers or query params
+    token = request.headers.get("Authorization")
+    if token and token.startswith("Bearer "):
+        token = token.split(" ")[1]
+    else:
+        token = request.query.get("token")
+
+    if not token:
+        # WebSocket exception handling
+        if request.path == '/ws':
+             return web.Response(status=401, text="Unauthorized: Token required")
+        return web.json_response({"error": "Unauthorized: Token required"}, status=401)
+
+    is_valid, user = auth.verify_token(token)
+    if not is_valid:
+        if request.path == '/ws':
+            return web.Response(status=401, text="Unauthorized: Invalid token")
+        return web.json_response({"error": "Unauthorized: Invalid token"}, status=401)
+
+    if not user['has_access'] and request.path != '/auth/link_code':
+        if request.path == '/ws':
+             return web.Response(status=403, text="Forbidden: Access code required")
+        return web.json_response({"error": "Forbidden: Access code required. Please link a valid code.", "needs_code": True}, status=403)
+
+    request['user'] = user
+    return await handler(request)
+
+app.middlewares.insert(0, auth_middleware)
+
+# --- Authentication Routes ---
+async def handle_register(request):
+    try:
+        data = await request.json()
+        username = data.get("username")
+        password = data.get("password")
+
+        if not username or not password:
+            return web.json_response({"error": "Username and password required"}, status=400)
+
+        success, msg = auth.register_user(username, password)
+        if success:
+            return web.json_response({"message": msg})
+        else:
+            return web.json_response({"error": msg}, status=400)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def handle_login(request):
+    try:
+        data = await request.json()
+        username = data.get("username")
+        password = data.get("password")
+
+        if not username or not password:
+            return web.json_response({"error": "Username and password required"}, status=400)
+
+        success, msg, token, has_access = auth.login_user(username, password)
+        if success:
+            return web.json_response({"message": msg, "token": token, "has_access": has_access})
+        else:
+            return web.json_response({"error": msg}, status=401)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def handle_link_code(request):
+    try:
+        data = await request.json()
+        code = data.get("code")
+
+        token = request.headers.get("Authorization")
+        if token and token.startswith("Bearer "):
+            token = token.split(" ")[1]
+
+        if not code or not token:
+            return web.json_response({"error": "Code and valid session required"}, status=400)
+
+        success, msg = auth.link_access_code(token, code)
+        if success:
+            return web.json_response({"message": msg})
+        else:
+            return web.json_response({"error": msg}, status=400)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+app.router.add_post('/auth/register', handle_register)
+app.router.add_post('/auth/login', handle_login)
+app.router.add_post('/auth/link_code', handle_link_code)
+
+# --- Chat API with DB ---
+async def handle_get_chats(request):
+    user = request['user']
+    chats = auth.get_user_chats(user['id'])
+    return web.json_response({"chats": chats})
+
+async def handle_create_chat(request):
+    try:
+        user = request['user']
+        data = await request.json()
+        title = data.get("title", "New Chat")
+
+        chat_id = auth.create_chat(user['id'], title)
+        return web.json_response({"chat_id": chat_id, "title": title})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def handle_get_chat_history(request):
+    user = request['user']
+    chat_id = request.match_info.get("chat_id")
+
+    if not chat_id:
+        return web.json_response({"error": "chat_id required"}, status=400)
+
+    messages = auth.get_chat_history(chat_id, user['id'])
+    if messages is None:
+         return web.json_response({"error": "Chat not found or unauthorized"}, status=404)
+
+    return web.json_response({"messages": messages})
+
+app.router.add_get('/api/chats', handle_get_chats)
+app.router.add_post('/api/chats', handle_create_chat)
+app.router.add_get('/api/chats/{chat_id}', handle_get_chat_history)
+
 async def handle_index(request):
     return web.FileResponse(os.path.join(WEB_DIR, 'index.html'))
 
 async def handle_chat_rest(request):
+    user = request['user']
     try:
         data = await request.json()
     except Exception:
         return web.json_response({"error": "Invalid JSON"}, status=400)
 
-    chat_id = data.get("chat_id", "rest_user")
+    chat_id = data.get("chat_id")
     message = data.get("message", "")
+
     if not message:
         return web.json_response({"error": "Message is required"}, status=400)
 
-    async with session_lock:
-        if chat_id not in user_sessions:
-            user_sessions[chat_id] = []
-        current_history = list(user_sessions[chat_id])
+    if not chat_id:
+        chat_id = auth.create_chat(user['id'], title=message[:30] + '...')
+
+    # Init history from DB
+    db_history = auth.get_chat_history(chat_id, user['id'])
+    if db_history is None:
+         return web.json_response({"error": "Chat not found or unauthorized"}, status=404)
+
+    current_history = [{"role": m["role"], "content": m["content"]} for m in db_history]
 
     # RESTBot collects actions to return them in the response
     class RESTBot:
@@ -92,17 +236,19 @@ async def handle_chat_rest(request):
         return web.json_response({"error": str(e)}, status=500)
 
     if final_response:
-        async with session_lock:
-            user_sessions[chat_id].append({"role": "user", "content": message})
-            user_sessions[chat_id].append({"role": "assistant", "content": final_response})
+        # Save to DB instead of in-memory dictionary
+        auth.add_message(chat_id, "user", message)
+        auth.add_message(chat_id, "assistant", final_response)
 
     return web.json_response({
+        "chat_id": chat_id,
         "response": final_response,
         "bot_actions": bot.actions,
         "agent_states": agent_states
     })
 
 async def handle_ws(request):
+    user = request['user']
     ws = web.WebSocketResponse()
     await ws.prepare(request)
 
@@ -110,11 +256,11 @@ async def handle_ws(request):
         if msg.type == web.WSMsgType.TEXT:
             data = json.loads(msg.data)
             action = data.get("action")
-            chat_id = data.get("chat_id", "web_user")
+            chat_id = data.get("chat_id")
 
-            async with session_lock:
-                if chat_id not in user_sessions:
-                    user_sessions[chat_id] = []
+            if not chat_id and action == "chat":
+                 chat_id = auth.create_chat(user['id'], title=data.get("message", "New Chat")[:30])
+                 await ws.send_json({"type": "system", "action": "chat_created", "chat_id": chat_id})
 
             # WsBot acts as a proxy, sending tool outputs (like files) back to the client
             class WsBot:
@@ -172,15 +318,17 @@ async def handle_ws(request):
             }
 
             if action == "clear":
-                async with session_lock:
-                    user_sessions[chat_id] = []
-                await ws.send_json({"type": "bot_action", "action": "clear", "chat_id": chat_id})
+                pass # Clearing handled client-side or by creating a new chat now.
 
             elif action == "chat":
                 user_input = data.get("message", "")
 
-                async with session_lock:
-                    current_history = list(user_sessions[chat_id])
+                db_history = auth.get_chat_history(chat_id, user['id'])
+                if db_history is None:
+                     await ws.send_json({"type": "error", "message": "Invalid chat_id"})
+                     continue
+
+                current_history = [{"role": m["role"], "content": m["content"]} for m in db_history]
 
                 final_response = ""
                 try:
@@ -200,20 +348,17 @@ async def handle_ws(request):
                     final_response = f"Ошибка: {str(e)}"
 
                 if final_response:
-                    async with session_lock:
-                        user_sessions[chat_id].append({"role": "user", "content": user_input})
-                        user_sessions[chat_id].append({"role": "assistant", "content": final_response})
+                    auth.add_message(chat_id, "user", user_input)
+                    auth.add_message(chat_id, "assistant", final_response)
 
         elif msg.type == web.WSMsgType.ERROR:
             logger.error(f"WebSocket connection closed with exception {ws.exception()}")
 
     return ws
 
+# Deprecated, handled by REST /api/chats/{chat_id} now
 async def handle_history(request):
-    chat_id = request.query.get("chat_id", "web_user")
-    async with session_lock:
-        history = user_sessions.get(chat_id, [])
-    return web.json_response({"history": history})
+    return web.json_response({"history": []})
 
 async def handle_download(request):
     filename = request.match_info.get("filename", "")
@@ -272,4 +417,9 @@ app.router.add_post('/upload', handle_upload)
 app.router.add_static('/static', WEB_DIR)
 
 if __name__ == '__main__':
+    # Generate startup access codes
+    codes = generate_access_codes(5)
+    print(f"[*] Generated 5 new access codes. Saved to коды_доступа.txt")
+    print(f"[*] Recent codes: {', '.join(codes)}")
+
     web.run_app(app, host='0.0.0.0', port=20067)

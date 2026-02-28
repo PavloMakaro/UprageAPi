@@ -1,8 +1,7 @@
 // State variables
 let ws;
 let isRecording = false;
-let chatId = localStorage.getItem('chatId') || `jarvis_${Math.random().toString(36).substr(2, 9)}`;
-localStorage.setItem('chatId', chatId);
+
 
 let apiUrl = localStorage.getItem('apiUrl') || 'ws://127.0.0.1:20067/ws';
 let restUrl = localStorage.getItem('restUrl') || 'http://127.0.0.1:20067';
@@ -33,12 +32,226 @@ const themeSelect = document.getElementById('theme-select');
 let currentFinalMsg = null;
 let currentThinkingBox = null;
 
+
+// Auth State
+let authToken = localStorage.getItem('authToken');
+let hasAccess = localStorage.getItem('hasAccess') === 'true';
+let username = localStorage.getItem('username');
+let currentChatId = null;
+
+// New DOM Elements for Auth
+const authView = document.getElementById('auth-view');
+const codeView = document.getElementById('code-view');
+const mainApp = document.getElementById('main-app');
+const authTitle = document.getElementById('auth-title');
+const authError = document.getElementById('auth-error');
+const authUsername = document.getElementById('auth-username');
+const authPassword = document.getElementById('auth-password');
+const authSubmitBtn = document.getElementById('auth-submit-btn');
+const authSwitchLink = document.getElementById('auth-switch-link');
+const authSwitchText = document.getElementById('auth-switch-text');
+const codeError = document.getElementById('code-error');
+const accessCode = document.getElementById('access-code');
+const codeSubmitBtn = document.getElementById('code-submit-btn');
+const chatHistoryList = document.getElementById('chat-history-list');
+const logoutBtn = document.getElementById('logout-btn');
+
+let isLoginMode = true;
+
+// Auth Functions
+function showAuthError(msg, isCode = false) {
+    const el = isCode ? codeError : authError;
+    el.textContent = msg;
+    el.style.display = 'block';
+}
+
+function clearAuthErrors() {
+    authError.style.display = 'none';
+    codeError.style.display = 'none';
+}
+
+function setAuthMode(login) {
+    isLoginMode = login;
+    authTitle.textContent = login ? 'Login to Jarvis' : 'Register for Jarvis';
+    authSubmitBtn.textContent = login ? 'Login' : 'Register';
+    authSwitchText.innerHTML = login ? "Don't have an account? <a id='auth-switch-link' style='cursor:pointer'>Register</a>" : "Already have an account? <a id='auth-switch-link' style='cursor:pointer'>Login</a>";
+    document.getElementById('auth-switch-link').addEventListener('click', () => setAuthMode(!isLoginMode));
+    clearAuthErrors();
+}
+
+async function handleAuth() {
+    clearAuthErrors();
+    const user = authUsername.value.trim();
+    const pass = authPassword.value.trim();
+    if (!user || !pass) return showAuthError("Username and password required");
+
+    const endpoint = isLoginMode ? '/auth/login' : '/auth/register';
+
+    try {
+        const res = await fetch(`${restUrl}${endpoint}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username: user, password: pass})
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error);
+
+        if (isLoginMode) {
+            authToken = data.token;
+            hasAccess = data.has_access;
+            username = user;
+            localStorage.setItem('authToken', authToken);
+            localStorage.setItem('hasAccess', hasAccess);
+            localStorage.setItem('username', username);
+            checkAuthState();
+        } else {
+            setAuthMode(true);
+            showAuthError("Registration successful! Please login.");
+            authError.style.color = "#4ade80"; // green
+        }
+    } catch (err) {
+        showAuthError(err.message);
+        authError.style.color = "#ff6b6b"; // reset to red
+    }
+}
+
+async function handleLinkCode() {
+    clearAuthErrors();
+    const code = accessCode.value.trim();
+    if (!code) return showAuthError("Code required", true);
+
+    try {
+        const res = await fetch(`${restUrl}/auth/link_code`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({code})
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error);
+
+        hasAccess = true;
+        localStorage.setItem('hasAccess', 'true');
+        checkAuthState();
+    } catch (err) {
+        showAuthError(err.message, true);
+    }
+}
+
+function logout() {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('hasAccess');
+    localStorage.removeItem('username');
+    authToken = null;
+    hasAccess = false;
+    currentChatId = null;
+    if(ws) ws.close();
+    checkAuthState();
+}
+
+// History Functions
+async function loadHistory() {
+    try {
+        const res = await fetch(`${restUrl}/api/chats`, {
+            headers: {'Authorization': `Bearer ${authToken}`}
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        chatHistoryList.innerHTML = '';
+        data.chats.forEach(chat => {
+            const li = document.createElement('li');
+            li.textContent = chat.title;
+            li.style.cursor = 'pointer';
+            li.onclick = () => loadChat(chat.id);
+            if (chat.id === currentChatId) li.style.color = 'var(--text-primary)';
+            chatHistoryList.appendChild(li);
+        });
+    } catch (e) { console.error("History load error", e); }
+}
+
+async function loadChat(chatId) {
+    try {
+        const res = await fetch(`${restUrl}/api/chats/${chatId}`, {
+            headers: {'Authorization': `Bearer ${authToken}`}
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        currentChatId = chatId;
+        msgArea.innerHTML = '';
+        welcomeScreen.classList.add('hidden');
+        msgArea.classList.remove('hidden');
+
+        data.messages.forEach(msg => {
+            const role = msg.role === 'user' ? 'user' : 'assistant';
+            const row = createMessageRow(msg.content, role);
+            if (role === 'assistant') {
+                row.querySelector('.message-content').innerHTML = marked.parse(msg.content);
+            }
+        });
+        loadHistory();
+        scrollToBottom();
+    } catch (e) { console.error("Chat load error", e); }
+}
+
+function startNewChat() {
+    currentChatId = null;
+    msgArea.innerHTML = '';
+    msgArea.classList.add('hidden');
+    welcomeScreen.classList.remove('hidden');
+    loadHistory();
+}
+
+function checkAuthState() {
+    authView.style.display = 'none';
+    codeView.style.display = 'none';
+    mainApp.style.display = 'none';
+
+    if (!authToken) {
+        authView.style.display = 'flex';
+        setAuthMode(true);
+    } else if (!hasAccess) {
+        codeView.style.display = 'flex';
+    } else {
+        mainApp.style.display = 'flex';
+        document.getElementById('user-name').textContent = username;
+        document.getElementById('user-avatar').textContent = username.charAt(0).toUpperCase();
+        document.getElementById('welcome-name').textContent = username;
+
+        // Greeting logic
+        const hour = new Date().getHours();
+        let greeting = 'Good evening';
+        if (hour < 12) greeting = 'Good morning';
+        else if (hour < 18) greeting = 'Good afternoon';
+        document.querySelector('.greeting').innerHTML = `<i class='bx bxs-sun' style='color:#d87b5a'></i> ${greeting}, ${username}`;
+
+        loadHistory();
+        initWS();
+    }
+}
+
+// Setup Auth listeners
+authSubmitBtn.addEventListener('click', handleAuth);
+codeSubmitBtn.addEventListener('click', handleLinkCode);
+logoutBtn.addEventListener('click', logout);
+document.getElementById('auth-switch-link')?.addEventListener('click', () => setAuthMode(!isLoginMode));
+
+authPassword.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleAuth(); });
+accessCode.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLinkCode(); });
+
+
 // Initialize
 applyTheme(currentTheme);
 apiUrlInput.value = apiUrl;
 restUrlInput.value = restUrl;
 themeSelect.value = currentTheme;
-initWS();
+checkAuthState();
+
 
 // --- Sidebar Toggles ---
 closeSidebarBtn.addEventListener('click', () => {
@@ -81,7 +294,7 @@ function applyTheme(theme) {
 function initWS() {
     console.log("Connecting to", apiUrl);
     try {
-        ws = new WebSocket(apiUrl);
+        ws = new WebSocket(`${apiUrl}?token=${authToken}`);
 
         ws.onopen = () => {
             console.log("Connected to Jarvis API");
@@ -198,7 +411,7 @@ function finishThinkingBox() {
 }
 
 function handleBotAction(payload) {
-    if (payload.chat_id !== chatId) return;
+    if (payload.chat_id !== currentChatId) return;
     welcomeScreen.classList.add('hidden');
     msgArea.classList.remove('hidden');
 
@@ -335,7 +548,7 @@ function sendMessage() {
     if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
 
     createMessageRow(text, 'user');
-    ws.send(JSON.stringify({ action: "chat", message: text, chat_id: chatId }));
+    ws.send(JSON.stringify({ action: "chat", message: text, chat_id: currentChatId }));
 
     input.value = "";
     input.style.height = 'auto';
@@ -345,7 +558,7 @@ function sendMessage() {
 
 newChatBtn.addEventListener('click', () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ action: "clear", chat_id: chatId }));
+        ws.send(JSON.stringify({ action: "clear", chat_id: currentChatId }));
     }
 });
 
@@ -362,7 +575,11 @@ fileInput.addEventListener('change', async (e) => {
     formData.append('file', file);
 
     try {
-        const res = await fetch(`${restUrl}/upload`, { method: 'POST', body: formData });
+        const res = await fetch(`${restUrl}/upload`, {
+                method: 'POST',
+                headers: {'Authorization': `Bearer ${authToken}`},
+                body: formData
+            });
         const data = await res.json();
         if (data.filepath) {
             const fileRef = `[File: ${data.filepath}]`;
