@@ -13,8 +13,11 @@
 <body>
 
     <!-- Authentication Views -->
-    <div id="auth-view" class="auth-container" style="display: none;">
-        <div class="auth-box">
+    <div id="auth-view" class="auth-container" style="display: none; position: relative;">
+        <div class="auth-box" style="position: relative;">
+            <button id="auth-settings-btn" class="icon-btn" style="position: absolute; top: 15px; right: 15px;" title="Settings">
+                <i class='bx bx-cog'></i>
+            </button>
             <h1 id="auth-title">Login to Jarvis</h1>
             <div id="auth-error" class="auth-error"></div>
 

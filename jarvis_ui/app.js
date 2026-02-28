@@ -22,6 +22,7 @@ const fileInput = document.getElementById('file-input');
 
 // Settings Elements
 const settingsBtn = document.getElementById('settings-btn');
+const authSettingsBtn = document.getElementById('auth-settings-btn');
 const settingsModal = document.getElementById('settings-modal');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
 const saveSettingsBtn = document.getElementById('save-settings-btn');
@@ -257,6 +258,10 @@ checkAuthState();
 closeSidebarBtn.addEventListener('click', () => {
     sidebar.classList.add('closed');
     openSidebarBtn.classList.remove('hidden');
+});
+
+authSettingsBtn?.addEventListener('click', () => {
+    settingsModal.classList.remove('hidden');
 });
 
 openSidebarBtn.addEventListener('click', () => {
