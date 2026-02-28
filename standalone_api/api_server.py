@@ -38,7 +38,9 @@ async def auth_middleware(request, handler):
     # Public routes
     public_routes = ['/', '/static/', '/auth/register', '/auth/login']
 
-    if request.path in public_routes or request.path.startswith('/static/') or request.path.startswith('/auth/'):
+    # We make downloads public so media links work easily inside markdown/chat logs
+    # without needing complex header injections in all potential clients.
+    if request.path in public_routes or request.path.startswith('/static/') or request.path.startswith('/auth/') or request.path.startswith('/download/'):
         return await handler(request)
 
     # Optional auth for OPTIONS (CORS)

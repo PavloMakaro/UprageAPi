@@ -3,8 +3,8 @@ let ws;
 let isRecording = false;
 
 
-let apiUrl = localStorage.getItem('apiUrl') || 'ws://127.0.0.1:20067/ws';
-let restUrl = localStorage.getItem('restUrl') || 'http://127.0.0.1:20067';
+let apiUrl = localStorage.getItem('apiUrl') || 'ws://c11.play2go.cloud:20067/ws';
+let restUrl = localStorage.getItem('restUrl') || 'http://c11.play2go.cloud:20067';
 let currentTheme = localStorage.getItem('theme') || 'dark';
 
 // DOM Elements
@@ -302,6 +302,11 @@ function initWS() {
 
         ws.onmessage = (event) => {
             const payload = JSON.parse(event.data);
+            if (payload.type === 'system' && payload.action === 'chat_created') {
+                currentChatId = payload.chat_id;
+                loadHistory();
+                return;
+            }
             if (payload.type === 'agent_state') {
                 handleAgentState(payload.data);
             } else if (payload.type === 'bot_action') {
@@ -436,7 +441,7 @@ function handleBotAction(payload) {
 function createMediaRow(type, filename, caption) {
     const row = document.createElement("div");
     row.className = "message-row";
-    const srcUrl = `${restUrl}/download/${encodeURIComponent(filename)}`;
+    const srcUrl = `${restUrl}/download/${encodeURIComponent(filename)}?token=${authToken}`;
 
     let mediaHtml = '';
     if (type === 'image') mediaHtml = `<img src="${srcUrl}" style="max-width:100%; border-radius:8px;">`;
@@ -459,7 +464,7 @@ function createMediaRow(type, filename, caption) {
 function createFileRow(filename, caption) {
     const row = document.createElement("div");
     row.className = "message-row";
-    const dlUrl = `${restUrl}/download/${encodeURIComponent(filename)}`;
+    const dlUrl = `${restUrl}/download/${encodeURIComponent(filename)}?token=${authToken}`;
 
     let captionHtml = caption ? `<div style="margin-top:8px; font-size: 0.9em;">${marked.parse(caption)}</div>` : '';
 

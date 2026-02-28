@@ -1,3 +1,39 @@
+
+let authToken = localStorage.getItem('oldClientToken');
+if (!authToken) {
+    const isLogin = confirm("Jarvis API now requires authentication. Click OK to login, or Cancel to register.");
+    const user = prompt("Username:");
+    const pass = prompt("Password:");
+
+    if (user && pass) {
+        const endpoint = isLogin ? '/auth/login' : '/auth/register';
+        fetch(endpoint, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username: user, password: pass})
+        }).then(r => r.json()).then(data => {
+            if (data.token) {
+                localStorage.setItem('oldClientToken', data.token);
+                if (!data.has_access) {
+                    const code = prompt("Beta access code required:");
+                    fetch('/auth/link_code', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${data.token}`},
+                        body: JSON.stringify({code})
+                    }).then(r => r.json()).then(d => {
+                         if(d.error) alert(d.error); else window.location.reload();
+                    });
+                } else {
+                    window.location.reload();
+                }
+            } else {
+                alert(data.error || data.message);
+                if (!isLogin) window.location.reload(); // Reload to login after register
+            }
+        });
+    }
+}
+
 let ws;
 let isRecording = false;
 let chatId = localStorage.getItem('chatId') || `web_${Math.random().toString(36).substr(2, 9)}`;
@@ -13,7 +49,7 @@ const fileInput = document.getElementById("file-input");
 
 function initWS() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    ws = new WebSocket(`${protocol}//${window.location.host}/ws?token=${authToken}`);
 
     ws.onopen = () => {
         console.log("Connected to JarvisClaw API");
@@ -226,7 +262,11 @@ fileInput.addEventListener('change', async (e) => {
     formData.append('file', file);
 
     try {
-        const res = await fetch('/upload', { method: 'POST', body: formData });
+        const res = await fetch('/upload', {
+            method: 'POST',
+            headers: {'Authorization': `Bearer ${authToken}`},
+            body: formData
+        });
         const data = await res.json();
         if (data.filepath) {
             const fileRef = `[File: ${data.filepath}]`;
@@ -269,7 +309,11 @@ micBtn.addEventListener('click', async () => {
             addMessage(`[Processing voice message...]`, 'tool');
 
             try {
-                const res = await fetch('/upload', { method: 'POST', body: formData });
+                const res = await fetch('/upload', {
+            method: 'POST',
+            headers: {'Authorization': `Bearer ${authToken}`},
+            body: formData
+        });
                 const data = await res.json();
                 if (data.filepath) {
                     const fileRef = `[Voice: ${data.filepath}]`;
