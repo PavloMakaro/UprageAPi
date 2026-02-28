@@ -1,0 +1,15 @@
+standalone_api.zip
+standalone_api.7z
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+venv-*
+ENV/
+env.bak/
+venv.bak/
+server.log
+test.py

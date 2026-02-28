@@ -1,0 +1,10 @@
+requests
+yt-dlp
+openai
+beautifulsoup4
+pydub
+watchdog
+tavily-python
+aiohttp
+groq
+pytz
