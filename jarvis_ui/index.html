@@ -142,38 +142,37 @@
                 </div>
             </div>
         </main>
+    </div>
 
-        <!-- Settings Modal -->
-        <div class="modal-overlay hidden" id="settings-modal">
-            <div class="modal">
-                <div class="modal-header">
-                    <h2>Settings</h2>
-                    <button class="icon-btn" id="close-settings-btn"><i class='bx bx-x'></i></button>
+    <!-- Settings Modal (Moved outside #main-app so it can be seen from Auth view) -->
+    <div class="modal-overlay hidden" id="settings-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="icon-btn" id="close-settings-btn"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Jarvis API URL (WebSocket)</label>
+                    <input type="text" id="api-url-input" value="ws://c11.play2go.cloud:20067/ws">
                 </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label>Jarvis API URL (WebSocket)</label>
-                        <input type="text" id="api-url-input" value="ws://c11.play2go.cloud:20067/ws">
-                    </div>
-                    <div class="form-group">
-                        <label>Jarvis REST URL (File Uploads)</label>
-                        <input type="text" id="rest-url-input" value="http://c11.play2go.cloud:20067">
-                    </div>
-                    <div class="form-group">
-                        <label>Theme</label>
-                        <select id="theme-select">
-                            <option value="dark">Dark</option>
-                            <option value="light">Light</option>
-                        </select>
-                    </div>
-                    <p class="settings-hint">Changes apply immediately upon connecting.</p>
+                <div class="form-group">
+                    <label>Jarvis REST URL (File Uploads)</label>
+                    <input type="text" id="rest-url-input" value="http://c11.play2go.cloud:20067">
                 </div>
-                <div class="modal-footer">
-                    <button class="btn primary-btn" id="save-settings-btn">Save & Reconnect</button>
+                <div class="form-group">
+                    <label>Theme</label>
+                    <select id="theme-select">
+                        <option value="dark">Dark</option>
+                        <option value="light">Light</option>
+                    </select>
                 </div>
+                <p class="settings-hint">Changes apply immediately upon connecting.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn primary-btn" id="save-settings-btn">Save & Reconnect</button>
             </div>
         </div>
-
     </div>
 
     <script src="app.js"></script>
