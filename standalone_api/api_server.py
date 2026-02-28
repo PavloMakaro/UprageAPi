@@ -74,7 +74,7 @@ async def auth_middleware(request, handler):
     request['user'] = user
     return await handler(request)
 
-app.middlewares.insert(0, auth_middleware)
+
 
 # --- Authentication Routes ---
 async def handle_register(request):
@@ -408,7 +408,8 @@ async def cors_middleware(request, handler):
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     return response
 
-app.middlewares.append(cors_middleware)
+app.middlewares.extend([cors_middleware, auth_middleware])
+
 
 app.router.add_get('/', handle_index)
 app.router.add_get('/ws', handle_ws)
@@ -416,6 +417,11 @@ app.router.add_post('/chat', handle_chat_rest)
 app.router.add_get('/history', handle_history)
 app.router.add_get('/download/{filename}', handle_download)
 app.router.add_post('/upload', handle_upload)
+
+# Allow OPTIONS on all endpoints
+for route in ['/', '/chat', '/history', '/upload', '/auth/register', '/auth/login', '/auth/link_code', '/api/chats', '/api/chats/{chat_id}']:
+    app.router.add_options(route, lambda r: web.Response())
+
 app.router.add_static('/static', WEB_DIR)
 
 if __name__ == '__main__':
