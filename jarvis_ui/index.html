@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarvis</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Boxicons for standard UI icons like Claude's -->
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <!-- Marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Jarvis</h2>
+                <button id="close-sidebar-btn" class="icon-btn"><i class='bx bx-dock-left'></i></button>
+            </div>
+
+            <nav class="sidebar-nav main-nav">
+                <button class="nav-btn new-chat-btn" id="new-chat-btn">
+                    <i class='bx bx-plus'></i> New chat
+                </button>
+                <button class="nav-btn"><i class='bx bx-search'></i> Search</button>
+                <button class="nav-btn" id="settings-btn"><i class='bx bx-briefcase-alt-2'></i> Settings</button>
+            </nav>
+
+            <div class="sidebar-section">
+                <nav class="sidebar-nav">
+                    <button class="nav-btn"><i class='bx bx-chat'></i> Chats</button>
+                    <button class="nav-btn"><i class='bx bx-folder'></i> Projects</button>
+                    <button class="nav-btn"><i class='bx bx-grid-alt'></i> Artifacts</button>
+                    <button class="nav-btn"><i class='bx bx-code-alt'></i> Code</button>
+                </nav>
+            </div>
+
+            <div class="sidebar-section recents-section">
+                <span class="section-title">Recents</span>
+                <ul class="recents-list" id="chat-history-list">
+                    <!-- History injected here -->
+                    <li>Jarvis API integration</li>
+                    <li>Python debugging help</li>
+                    <li>Website design ideas</li>
+                </ul>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="avatar">U</div>
+                    <div class="user-details">
+                        <span class="name">User</span>
+                        <span class="plan">Free plan</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CHAT AREA -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <button id="open-sidebar-btn" class="icon-btn hidden"><i class='bx bx-menu'></i></button>
+                    <span class="model-selector" id="model-selector">
+                        Jarvis 4.6 <i class='bx bx-chevron-down'></i>
+                    </span>
+                </div>
+                <div class="top-bar-right">
+                    <button class="action-btn">Share</button>
+                </div>
+            </header>
+
+            <div class="chat-container">
+                <!-- Welcome Screen (Visible on new chat) -->
+                <div class="welcome-screen" id="welcome-screen">
+                    <div class="plan-badge">Free plan · <a href="#">Upgrade</a></div>
+                    <h1 class="greeting"><i class='bx bxs-sun' style='color:#d87b5a'></i> Good afternoon, User</h1>
+                </div>
+
+                <!-- Messages Area -->
+                <div class="messages-area hidden" id="messages-area">
+                    <!-- Messages will be injected here -->
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-wrapper">
+                <div class="input-container">
+                    <button class="attach-btn icon-btn" id="attach-btn" title="Attach file"><i class='bx bx-plus'></i></button>
+                    <input type="file" id="file-input" style="display: none;" accept="image/*, audio/*, video/*, .pdf, .txt, .md, .csv">
+                    <textarea id="message-input" placeholder="How can I help you today?" rows="1"></textarea>
+
+                    <div class="input-controls">
+                        <button class="voice-btn icon-btn" id="mic-btn" title="Voice input"><i class='bx bx-microphone'></i></button>
+                        <button class="send-btn icon-btn" id="send-btn" disabled><i class='bx bx-up-arrow-alt'></i></button>
+                    </div>
+                </div>
+                <div class="input-footer">
+                    <span>Jarvis can make mistakes. Please double-check responses.</span>
+                </div>
+            </div>
+        </main>
+
+        <!-- Settings Modal -->
+        <div class="modal-overlay hidden" id="settings-modal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>Settings</h2>
+                    <button class="icon-btn" id="close-settings-btn"><i class='bx bx-x'></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Jarvis API URL (WebSocket)</label>
+                        <input type="text" id="api-url-input" value="ws://127.0.0.1:20067/ws">
+                    </div>
+                    <div class="form-group">
+                        <label>Jarvis REST URL (File Uploads)</label>
+                        <input type="text" id="rest-url-input" value="http://127.0.0.1:20067">
+                    </div>
+                    <div class="form-group">
+                        <label>Theme</label>
+                        <select id="theme-select">
+                            <option value="dark">Dark</option>
+                            <option value="light">Light</option>
+                        </select>
+                    </div>
+                    <p class="settings-hint">Changes apply immediately upon connecting.</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn primary-btn" id="save-settings-btn">Save & Reconnect</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
